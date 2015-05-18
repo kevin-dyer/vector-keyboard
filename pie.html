@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.arc path {
+  stroke: #fff;
+}
+
+.center {
+	box-shadow: inset 10px 10px 5px 0px 'white';
+}
+form {
+	float:left;
+}
+.messageBox{
+	width:250px;
+	font-size:23px;
+	height:150px;
+	margin:60px 0px;
+	padding:20px;
+}
+svg{
+	//float:left;
+}
+
+
+</style>
+<body>
+<script src="./d3.min.js"></script>
+<script>
+
+var width = 300,
+    height = 300,
+    radius = 125,
+	centerRad = 35,
+	buttonHeight = 45,
+	initTime = 200,
+	delayFactor = 30,
+	letterAngles;
+	
+
+var color = d3.scale.ordinal()
+    .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+
+
+
+var initArc = d3.svg.arc()
+	.outerRadius(centerRad)
+	.innerRadius(centerRad - 10);
+
+var transArc = d3.svg.arc()
+	.outerRadius(radius)
+	.innerRadius(radius - 10);
+
+var arc = d3.svg.arc()
+    	.outerRadius(radius)
+    	.innerRadius(radius - buttonHeight);
+
+var largeArc = d3.svg.arc()
+		.outerRadius(radius + 10)
+		//.innerRadius(radius - buttonHeight - 5);
+		.innerRadius(0);
+		
+
+var pie = d3.layout.pie()
+    .sort(null)
+    .value(function(d) { return d.population; });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height)
+	//.style("background", '#E8E8E8')
+  .append("g")
+    .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+var back = svg.append('circle')
+	.attr("class", 'back')
+	.attr("x", width/2)
+	.attr('y', height/2)
+	.attr("r", centerRad)
+	.style('fill', '#FFFFFF')
+	.transition()
+		.duration(initTime)
+		//.style('fill', '#E8E8E8')
+		.style('fill', '#FFFFFF')
+		
+		.attr("r", radius - buttonHeight)
+	.transition()
+		.delay(delayFactor * 26)
+		.duration(100)
+		.attr("r", radius + 1);
+		
+
+		
+	
+
+
+		
+
+
+d3.csv("data.csv", function(error, data) {
+
+  // data.forEach(function(d) {
+  //        d.letter = d.age;
+  //      });
+  
+  var g = svg.selectAll(".arc")
+      .data(pie(data))
+    .enter().append("g")
+      .attr("class", "arc")
+	//.style('stroke', "#FFFFFF")
+	// 	.style('stroke-width', 1.5);
+	
+  g.append("path")
+		.attr("class", "letterBox")
+		.attr("id", function(d, i){
+			return d.data.age;
+		})
+		.style("fill", "#EDE5DA")
+      .attr("d", initArc)
+		// .style('stroke', "#E8E8E8")
+		// 		.style('stroke-width', 2)
+		.transition()
+			.delay(function (d, i) {
+				return i * delayFactor;
+			})
+			.duration(initTime)
+			.attr('d', transArc)
+		.transition()
+			.delay(function(d, i){
+				return i * delayFactor + initTime;
+			})
+			.duration(initTime)
+			.attr("d", arc);
+
+  g.append("text")
+	.attr("dy", ".35em")
+	.attr('id', function (d, i){
+		return 'txt'+d.data.age;
+	})
+    .style("text-anchor", "middle")
+	.style('font-size', 15)
+	.style('fill', '#000000')
+	.attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
+	.transition()
+		//.ease('poly', 0.3)
+		.duration(initTime)
+		.delay(function(d, i){
+			return i * delayFactor + initTime;
+		})
+		.text(function(d) { return d.data.age; });
+		
+		
+	var front = svg.append('circle')
+		.attr("class", 'front')
+		.attr("x", width/2)
+		.attr('y', height/2)
+		.attr("r", radius + 1)
+		.style("fill", '#454545')
+		.attr("opacity", 0.0000001)
+		.on('mouseenter', startListening)
+		.on('mouseout', stopListening)
+		.on('mousemove', mouseRecorder);
+
+	var center = svg.append('circle')
+		.attr('class', 'center')
+		.attr("x", width/2)
+		.attr('y', height/2)
+		.attr('r', 35)
+		.style('fill', '#636363')
+		.attr("opacity", 1)
+		.on('mouseenter', stopRecording)
+		.on('mouseleave', startRecording)
+		// .on('click', centerClick)
+		// 		.on('dblclick', centerDblClick);
+		.on('click', function(d){
+			addSpace();
+			flash();
+		})
+		.on('dblclick', addPeriod);
+
+					
+	//initialize letter angles
+	letterAngles = letterAngles();
+	
+
+
+});
+
+
+			
+			
+
+
+//log mouse positions
+var avgData = {xSum: 0, ySum: 0, total: 0, log:[]};
+
+
+//set up event listeners
+var isListening = false;
+var isRecording = false;
+var inCenter = false;
+
+function startListening () {
+	if (isListening) return;
+	isListening = true;
+	
+	
+}
+
+function stopListening () {
+	isListening = false;
+	if(inCenter) return;
+	isRecording = false;
+	resetWedges();
+}
+
+function startRecording () {
+	isListening = true;
+	isRecording = true;
+	inCenter = false;
+	avgData.xSum = 0;
+	avgData.ySum = 0;
+	avgData.total = 0;
+	avgData.log = [];
+	//console.log('start recording');
+	//console.log("front number: ", d3.selectAll('.front').length);
+	svg.on('mousemove', function (){
+		
+		if (!isListening || !isRecording) return;
+		
+		var point = d3.mouse(this),
+			hand = {x: point[0], y: point[1]};
+		avgData.xSum += hand.x;
+		avgData.ySum += hand.y;
+		avgData.total++;
+		avgData.log.push(hand);
+		
+		var tmp;
+		while (avgData.log.length > 30) {
+			tmp = avgData.log.shift();
+			avgData.xSum -= tmp.x;
+			avgData.ySum -= tmp.y;
+			avgData.total--; 
+		}
+		
+		var ang = avgAngle((avgData.xSum / avgData.total), (avgData.ySum / avgData.total));
+		var letter = findClosestLetter(ang);
+		resetWedges();
+		emphasizeWedge(letter);
+		
+		
+		
+	
+	});
+}
+
+function stopRecording () {
+	isListening = true; //just incase mouse starts inside the back circle
+	if (!isRecording) return;
+	isRecording = false;
+	inCenter = true;
+	
+	resetWedges();
+	
+	//console.log("stop recording");
+	if (!avgData.total) {
+		//console.log("avgData.total is zero");
+		return;
+	}
+	
+	var ang = avgAngle((avgData.xSum / avgData.total), (avgData.ySum / avgData.total));
+	//console.log("mouse angle = ", ang);
+	var closestLetter = findClosestLetter(ang);
+	
+	addText(closestLetter);
+}
+
+function mouseRecorder () {
+	if( !isListening || !isRecording) return;
+	
+	var point = d3.mouse(this),
+		hand = {x: point[0], y: point[1]};
+	//console.log("x: "+hand.x+ ", y: "+hand.y);
+	
+}
+
+function centerClick () {
+	
+}
+
+function centerDblClick () {
+	
+}
+
+function findClosestLetter (angle) {
+	var length = letterAngles.length,
+		i,
+		closestLetter = letterAngles[0];
+	for(i = 1; i < length; i++){
+		
+		if (Math.abs(closestLetter.angle - angle) > Math.abs(letterAngles[i].angle - angle)) closestLetter = letterAngles[i];
+	}
+	//console.log(closestLetter.letter);
+	
+	
+	
+	return closestLetter.letter;
+}
+
+
+function letterAngles () {
+	var letterAngles1 = [],
+		letterAngle,
+		adjAngle,
+		pi = Math.PI;
+
+	d3.selectAll('text').each(function(d){
+		//console.log('text: ', d.startAngle);
+		letterAngle = 0.5 * pi - ((d.startAngle + d.endAngle) / 2);
+		adjAngle = letterAngle  < 0 
+			? 2 * pi + letterAngle
+			: letterAngle;
+		letterAngles1.push({letter: d.data.age, angle: adjAngle});
+		//console.log("letter: ", d.data.age, ", angle: ", adjAngle);
+	});
+	return letterAngles1;
+}
+
+function avgAngle (x, y) {
+	// var halfAngle = 57.2957795 * (Math.atan2((-1*(y - height/2)), (x - width/ 2)));
+	// 	return halfAngle >= 0 ? halfAngle : 360 + halfAngle;
+	var halfAngle = Math.atan2((-1*y), x);
+		return halfAngle >= 0 ? halfAngle : Math.PI * 2 + halfAngle;
+}
+
+function resetWedges () {
+	svg.selectAll('.letterBox')
+		//.style('fill', '#FFFFFF')
+		.transition()
+			.duration(50)
+			.attr('d', arc)
+			.style('fill', "#EDE5DA")
+			.style('stroke', "");
+			//.style('stroke-width', 2);
+			
+	svg.selectAll('text').style('fill', '#000000')
+		.style("font-size", 15);
+}
+
+function emphasizeWedge (letter) {
+	svg.select('#' + letter)
+		//.style("fill", "blue")
+		.transition()
+			.duration(50)
+			.attr('d', largeArc)
+			.style('fill', '#636363')
+			.style('stroke', '#c6dbef');
+			
+	svg.select('#txt'+letter)
+		.style('fill', '#c6dbef')
+		.style("font-size", 19);
+		//.style("stroke", 'rgba(0,0,0,0)');
+}
+
+function addText(txt){
+	var currentText = document.getElementById('message'),
+		val = currentText.value;
+	currentText.value = val.match(/(\.\s+$)|(^$)|(\n$)/) ? val + txt.toUpperCase() : val + txt.toLowerCase();
+	currentText.focus();
+}
+
+function rmSpace(){
+	var currentText = document.getElementById('message');
+	currentText.value = currentText.value.trim();
+	currentText.focus();
+}
+
+function addSpace(){
+	addText(' ');
+}
+
+function addPeriod(){
+	rmSpace();
+	addText('. ');
+}
+
+function flash(){
+	svg.select('.center').style("stroke", 'rgba(250,250,190, 0.3)')
+		.style("stroke-width", 0)
+		.transition()
+			.duration(100)
+			.style("stroke-width", 40)
+		.transition()
+			.duration(100)
+			.style("stroke-width", 0);
+	
+}
+
+
+</script>
+
+<body>
+	<div>
+	<form class='text-form'>
+		<textarea id='message' class='messageBox' type='text' autocomplete="on" autocorrect="on" autocapitalize="off" spellcheck="on" placeholder="Write your message here. Click center circle once for space and double click for a period."></textarea>
+	</form>
+	</div>
+</body>
