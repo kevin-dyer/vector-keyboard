@@ -5,12 +5,15 @@
 
 <style>
 
+html, body {
+	height: 100%;
+}
 body {
   font: 15px sans-serif;
-  position: fixed;
   overflow: hidden;
   margin:0;
   padding:0;
+  position: fixed;
 	-webkit-user-select: none;
 	-khtml-user-select: none;
  	-moz-user-select: none;
@@ -31,9 +34,14 @@ form {
 	width:100%;
 	font-size:23px;
 	height:120px;
-	position:fixed;
+	border: none;
+	/*padding: 20px;*/
 }
-svg{
+
+.keyboard-svg {
+	position: absolute;
+}
+/*svg{
 	-webkit-user-select: none;
 	-khtml-user-select: none;
  	-moz-user-select: none;
@@ -44,7 +52,7 @@ svg{
   	top: 120px;
 
   	-webkit-user-select: none;  -khtml-user-select: none;   -moz-user-select: none; -o-user-select: none;    user-select: none;
-}
+}*/
 
 .selectDisable {-webkit-user-select: none;  -khtml-user-select: none;   -moz-user-select: none; -o-user-select: none;    user-select: none; }
 
@@ -99,10 +107,10 @@ pie = d3.layout.pie()
     .sort(null)
     .value(function(d) { return d.population; });
 
-svg = d3.select("body").append("svg")
-    .attr("width", width)
-    .attr("height", height)
-    .attr("class", "keyboard-container");
+// svg = d3.select("body").append("svg")
+//     .attr("width", width)
+//     .attr("height", height)
+//     .attr("class", "keyboard-container");
   // .append("g")
   //   .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
 
@@ -110,17 +118,23 @@ function updateKeyboard () {
 	//TODO: remove this
 	removeKeyboard();
 
-	console.log("updateKeyboard");
-	
-	var keyboard = svg.append('g')
-		// .data(pie(keyData))
-		.attr("class", "keyboard")
-		.attr("transform", "translate(" + keyboardCenter.x + "," + keyboardCenter.y + ")");
-		// .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+	console.log("updateKeyboard keyboardCenter: ", keyboardCenter);
+	svg = d3.select("body")
+				.append("svg")
+				.style("top", keyboardCenter.y)
+				.style("left", keyboardCenter.x)
+				.style("height", radius * 2)
+				.style("width", radius * 2)
+				.attr("class", "keyboard-svg")
+				.style("transform", "translate(-50%, -50%)");
 
-	// keyboard.exit().remove();
+	var keyboard = svg
+				.append('g')
+				.attr("class", "keyboard")
+				.attr("transform", "translate(" + radius + "," + radius + ")");
+				// .attr("transform", "translate(" + keyboardCenter.x + "," + keyboardCenter.y + ")");
 
-	svg.append("circle").attr("r", "5").attr("x", keyboardCenter.x).attr("y", keyboardCenter.y);
+	// svg.append("circle").attr("r", "50").attr("x", keyboardCenter.x).attr("y", keyboardCenter.y).style("fill", "black");
 
 	var g,
 		center,
@@ -198,98 +212,23 @@ function updateKeyboard () {
 }
 
 function removeKeyboard () {
-	var keyboard = svg.select('.keyboard').remove();
+	var keyboard = d3.select('.keyboard-svg').remove();
 }
 
 
 d3.csv("data.csv", function(error, data) {
 	keyData = data;
-
-	// updateKeyboard();
-
-	// var g,
-	// 	center,
-	// 	front;
-
-	// g = svg.selectAll(".arc")
- //    	.data(pie(data))
- //    	.enter().append("g")
- //    	.attr("class", "arc")
-	
-	// g.append("path")
-	// 	.attr("class", "letterBox")
-	// 	.attr("id", function(d, i){
-	// 		return d.data.age;
-	// 	})
-	// 	.style("fill", "#EDE5DA")
- //    	.attr("d", initArc)
-	// 	.transition()
-	// 		.delay(function (d, i) {
-	// 			return i * delayFactor;
-	// 		})
-	// 		.duration(initTime)
-	// 		.attr('d', transArc)
-	// 	.transition()
-	// 		.delay(function(d, i){
-	// 			return i * delayFactor + initTime;
-	// 		})
-	// 		.duration(initTime)
-	// 		.attr("d", arc);
-
-	// g.append("text")
-	// 	.attr("dy", ".35em")
-	// 	.attr('id', function (d, i){
-	// 		return 'txt'+d.data.age;
-	// 	})
-	//     .style("text-anchor", "middle")
-	// 	.style('font-size', 15)
-	// 	.style('fill', '#000000')
-	// 	.attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
-	// 	.transition()
-	// 		.duration(initTime)
-	// 		.delay(function(d, i){
-	// 			return i * delayFactor + initTime;
-	// 		})
-	// 		.text(function(d) { return d.data.age; });
-		
-	// center = svg.append('circle')
-	// 	.attr('class', 'center')
-	// 	.attr("x", width/2)
-	// 	.attr('y', height/2)
-	// 	.attr('r', centerDotRad)
-	// 	.style('fill', '#636363')
-	// 	.attr("opacity", 1);
-
-	// front = svg.append('circle')
-	// 	.attr("class", 'front')
-	// 	.attr("x", width/2)
-	// 	.attr('y', height/2)
-	// 	.attr("r", radius + 1)
-	// 	.style("fill", '#454545')
-	// 	.attr("opacity", 0.0000001)
-	// 	.on('touchmove', mouseRecorder)
-	// 	.on('touchend', stopRecording)
-	// 	.on('click', function(d){
-	// 		addSpace();
-	// 		flash();
-	// 	});
-	// 	//.on('dblclick', addPeriod);
-					
-	// //initialize letter angles
-	// letterAngles = letterAngles();
 });
 
-var clickTimeout,
-		touchendTimeout;
+var clickTimeout;
 
-d3.select('.keyboard-container').on('touchstart', function (event) {
+d3.select('body').on('touchstart', function (event) {
 	
 	console.log("hey");
 	var d = d3.touches(this);
 	d = d[0] ? d[0] : d;
 	console.log("touchstart! event: ", d);
 
-	clearTimeout(touchendTimeout);
 	clickTimeout = setTimeout(function () {
 		keyboardCenter = {x: d[0], y: d[1]};
 		console.log("updateKeyboard called! keyboardCenter: ", keyboardCenter);
@@ -298,26 +237,27 @@ d3.select('.keyboard-container').on('touchstart', function (event) {
 	}, 350);
 });
 
-//TODO: remove after testing
-d3.select('.keyboard-container').on('mousedown', function (event) {
+// d3.select('body').on('mousedown', function (event) {
 	
-	console.log("hey");
-	var d = d3.mouse(this);
-	console.log("mouse event: ", d);
+// 	console.log("hey");
+// 	var d = d3.mouse(this);
+// 	// d = d[0] ? d[0] : d;
+// 	console.log("d3.mouse(this): ", d3.mouse(this));
+// 	console.log("d3.touch(this): ", d3.touch(this));
 
-	clearTimeout(touchendTimeout);
-	clickTimeout = setTimeout(function () {
-		keyboardCenter = {x: d[0], y: d[1]};
-		console.log("updateKeyboard called! keyboardCenter: ", keyboardCenter);
-		updateKeyboard();
-		clickTimeout = null;
-	}, 350);
-});
+// 	clickTimeout = setTimeout(function () {
+// 		keyboardCenter = {x: d[0], y: d[1]};
+// 		console.log("updateKeyboard called! keyboardCenter: ", keyboardCenter);
+// 		updateKeyboard();
+// 		clickTimeout = null;
+// 	}, 350);
+// });
 
-d3.select('.keyboard-container').on('touchend', function (event) {
+d3.select('body').on('touchend', function (event) {
 	console.log("dragend");
 	
 	clearTimeout(clickTimeout);
+	removeKeyboard();
 	// touchendTimeout = setTimeout(function () {
 	// 	console.log("removing keyboard");
 	// 	removeKeyboard();
@@ -475,7 +415,12 @@ function emphasizeWedge (letter) {
 function addText(txt){
 	var currentText = document.getElementById('message'),
 		val = currentText.value;
+
 	currentText.value = val.match(/(\.\s+$)|(^$)|(\n$)/) ? val + txt.toUpperCase() : val + txt.toLowerCase();
+}
+
+function updateText() {
+
 }
 
 function rmSpace(){
