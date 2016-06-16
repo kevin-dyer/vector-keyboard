@@ -83,10 +83,9 @@ form {
 
 var width = (window.innerWidth > 0) ? window.innerWidth : screen.width,
     height = width,
-    // radius = width / 2 - 20,
     radius = 70,
 	centerRad = 35,
-	centerDotRad = 10,
+	centerDotRad = 7,
 	buttonHeight = 25,
 	initTime = 150,
 	delayFactor = 10,
@@ -104,9 +103,9 @@ var width = (window.innerWidth > 0) ? window.innerWidth : screen.width,
   keyData,
   keyboardCenter,
   touch = {
-  	list: [],
+  	highestPt: null,
+  	furthestDist: 0,
   	isRecording: false,
-  	avg: [0,0]
   };
 
 initArc = d3.svg.arc()
@@ -143,30 +142,6 @@ function updateKeyboard () {
 				// .style('border', '1px solid black')
 				.attr("class", "keyboard-svg")
 				.style("transform", "translate(" + (parseInt(keyboardCenter.x) - radius) + "px," + (parseInt(keyboardCenter.y) - 3 * radius - vertOffset) + "px)");
-				// .on('touchmove', function () {
-				// 	//TODO: deal with multiple touch events at once
-				// 	var d = d3.touches(this)[0];
-				// 	console.log("touchmove d: ", d, ", distance: ", distance(d, touchCenter), ", touchCenter: ", touchCenter);
-				// 	if (distance(d, touchCenter) < centerDotRad) {
-				// 		//Inside center
-				// 		// update message and indicator isRecording: false
-				// 		if (touch.isRecording) {
-				// 			//add letter
-				// 			touch.list = [];
-				// 			touch.isRecording = false;
-				// 		}
-				// 	} else {
-				// 		// Outside center
-				// 		// collect touchHistory
-				// 		touch.list.push(d);
-				// 		touch.avg = touch.list.reduce(function (previousValue, currentValue, currentIndex, array) {
-				// 			return [previousValue[0] + currentValue[0], previousValue[1] + currentValue[1]];
-				// 		})
-				// 	}
-				// })
-				// .on('touchend', function () {
-
-				// });
 
 	var keyboard = svg
 				.append('g')
@@ -176,11 +151,6 @@ function updateKeyboard () {
 	var feedback = keyboard.append('circle')
 				.attr("class", "feedback")
 				.attr("r", 5);
-
-	// var feedback = body.append('div')
-	// 			.attr("class", "feedback")
-	// 			.style("top", (keyboardCenter.y - vertOffset) + "px")
-	// 			.style("left", (keyboardCenter.x) + "px");
 
 	var thumb = body.append("div")
 		.attr("class", "thumb")
@@ -196,9 +166,6 @@ function updateKeyboard () {
 
 	g = keyboard.selectAll(".arc")
     	.data(pie(keyData))
-    	// .data(function (d) {
-    	// 	return d;
-    	// })
     	.enter().append("g")
     	.attr("class", "arc")
 	
@@ -207,7 +174,9 @@ function updateKeyboard () {
 		.attr("id", function(d, i){
 			return d.data.age;
 		})
-		.style("fill", "#EDE5DA")
+		.style("fill", "#FFFFFF")
+		// .style("stroke", "#000")
+		// .style("stroke-width", 1)
     	.attr("d", initArc)
 		.transition()
 			.delay(function (d, i) {
@@ -270,12 +239,8 @@ body.on('touchstart', function (event) {
 	d = d[0] ? d[0] : d;
 	console.log("touchstart! event: ", d);
 
-	// clickTimeout = setTimeout(function () {
-		keyboardCenter = {x: d[0], y: d[1]};
-		// console.log("updateKeyboard called! keyboardCenter: ", keyboardCenter);
-		updateKeyboard();
-		// clickTimeout = null;
-	// }, 350);
+	keyboardCenter = {x: d[0], y: d[1]};
+	updateKeyboard();
 });
 
 body.on('touchmove', function () {
@@ -285,71 +250,30 @@ body.on('touchmove', function () {
 	// console.log("touchmove d: ", d, ", distance: ", distance(d, touchCenter), ", touchCenter: ", touchCenter);
 	if (distance(d, touchCenter) < centerDotRad) {
 		//Inside center
-		// update message and indicator isRecording: false
-
-			
 		if (touch.isRecording) {
-			var ang = avgAngle(touch.avg[0] - keyboardCenter.x, touch.avg[1] - keyboardCenter.y);
-			var closestLetter = findClosestLetter(ang);
-			addText(closestLetter);
-
+			var ang = avgAngle(touch.highestPt[0] - keyboardCenter.x, touch.highestPt[1] - keyboardCenter.y);
+			var letter = findClosestLetter(ang);
+			addText(letter);
 			resetWedges();
 			//add letter
 			//reset touch values
-			touch.list = [];
+			touch.furthestDist = 0;
+			touch.highestPt = null;
 			touch.isRecording = false;
 		}
 
-		// d3.select('.feedback')
-		// 	.attr("cy", parseInt(d[1] - keyboardCenter.y) + "px")
-		// 	.attr("cx", parseInt(d[0] - keyboardCenter.x) + "px");
 	} else {
-		// Outside center
-		// collect touchHistory
-		touch.list.push(d);
 
-		if (touch.list.length > historyLength) {
-			touch.list.shift();
+		var tmpDist = distance(d, touchCenter);
+		if (tmpDist >= touch.furthestDist) {
+			touch.furthestDist = tmpDist;
+			touch.highestPt = d;
+
+			var ang = avgAngle(touch.highestPt[0] - keyboardCenter.x, touch.highestPt[1] - keyboardCenter.y);
+			var letter = findClosestLetter(ang);
+			resetWedges();
+			emphasizeWedge(letter);
 		}
-		//Needed for real time feedback
-		var sum = [0,0],
-				t,
-				i;
-		for (i = 0; i < touch.list.length; i++) {
-			t = touch.list[i];
-			sum[0] += t[0];
-			sum[1] += t[1];
-		}
-		touch.avg = sum.map(function (dim) {
-			return dim / touch.list.length;
-		});
-
-
-
-		// touch.list.each(function (touch) {
-		// 	sum[0] += touch[0];
-		// 	// return [previousValue[0] + currentValue[0], previousValue[1] + currentValue[1]];
-		// });
-		// touch.avg = sum.map(function (dim) {
-		// 	return dim / touch.list.length;
-		// });
-
-
-		console.log("touch.avg: ", touch.avg);
-
-
-		var ang = avgAngle(touch.avg[0] - keyboardCenter.x, touch.avg[1] - keyboardCenter.y);
-
-		// console.log("ang: ", ang);
-		var letter = findClosestLetter(ang);
-		resetWedges();
-		emphasizeWedge(letter);
-
-		console.log("touch.avg: ", touch.avg, ", touchCenter: ", touchCenter);
-
-		// d3.select('.feedback')
-		// 	.attr("cy", parseInt(touch.avg[1] - keyboardCenter.y) + "px")
-		// 	.attr("cx", parseInt(touch.avg[0] - keyboardCenter.x) + "px");
 
 		touch.isRecording = true;
 	}
@@ -492,7 +416,7 @@ function resetWedges () {
 		.transition()
 			.duration(50)
 			.attr('d', arc)
-			.style('fill', "#EDE5DA")
+			.style('fill', "#FFFFFF")
 			.style('stroke', "");
 			
 	svg.selectAll('text').style('fill', '#000000')
@@ -505,12 +429,12 @@ function emphasizeWedge (letter) {
 		.transition()
 			.duration(50)
 			.attr('d', largeArc)
-			.style('fill', '#636363')
-			.style('stroke', '#c6dbef');
+			.style('fill', '#b6b6b6')
+			// .style('stroke', '#c6dbef');
 			
 	svg.select('#txt'+letter)
-		.style('fill', '#c6dbef')
-		.style("font-size", 30)
+		.style('fill', '#c7011c')
+		.style("font-size", 18)
 		.attr("dy", ".37em");
 }
 
