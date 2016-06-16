@@ -143,30 +143,6 @@ function updateKeyboard () {
 				// .style('border', '1px solid black')
 				.attr("class", "keyboard-svg")
 				.style("transform", "translate(" + (parseInt(keyboardCenter.x) - radius) + "px," + (parseInt(keyboardCenter.y) - 3 * radius - vertOffset) + "px)");
-				// .on('touchmove', function () {
-				// 	//TODO: deal with multiple touch events at once
-				// 	var d = d3.touches(this)[0];
-				// 	console.log("touchmove d: ", d, ", distance: ", distance(d, touchCenter), ", touchCenter: ", touchCenter);
-				// 	if (distance(d, touchCenter) < centerDotRad) {
-				// 		//Inside center
-				// 		// update message and indicator isRecording: false
-				// 		if (touch.isRecording) {
-				// 			//add letter
-				// 			touch.list = [];
-				// 			touch.isRecording = false;
-				// 		}
-				// 	} else {
-				// 		// Outside center
-				// 		// collect touchHistory
-				// 		touch.list.push(d);
-				// 		touch.avg = touch.list.reduce(function (previousValue, currentValue, currentIndex, array) {
-				// 			return [previousValue[0] + currentValue[0], previousValue[1] + currentValue[1]];
-				// 		})
-				// 	}
-				// })
-				// .on('touchend', function () {
-
-				// });
 
 	var keyboard = svg
 				.append('g')
@@ -176,11 +152,6 @@ function updateKeyboard () {
 	var feedback = keyboard.append('circle')
 				.attr("class", "feedback")
 				.attr("r", 5);
-
-	// var feedback = body.append('div')
-	// 			.attr("class", "feedback")
-	// 			.style("top", (keyboardCenter.y - vertOffset) + "px")
-	// 			.style("left", (keyboardCenter.x) + "px");
 
 	var thumb = body.append("div")
 		.attr("class", "thumb")
@@ -267,6 +238,15 @@ var body = d3.select('body');
 body.on('touchstart', function (event) {
 	
 	var d = d3.touches(this);
+
+	//Test
+	if (d.length === 2) {
+		doubleKeyboard(d);
+	} else if (d.length === 1) {
+		keyboardCenter = {x: d[0], y: d[1]};
+		updateKeyboard();
+	}
+
 	d = d[0] ? d[0] : d;
 	console.log("touchstart! event: ", d);
 
