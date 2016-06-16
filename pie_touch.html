@@ -7,6 +7,7 @@
 
 html, body {
 	height: 100%;
+	width: 100%;
 }
 body {
   font: 15px sans-serif;
@@ -41,6 +42,21 @@ form {
 .keyboard-svg {
 	position: absolute;
 }
+
+.thumb {
+	position: absolute;
+	background-color: black;
+}
+
+.feedback {
+	position: absolute;
+	background-color: black;
+	width: 5px;
+	height: 5px;
+	border-radius: 5px;
+}
+
+
 /*svg{
 	-webkit-user-select: none;
 	-khtml-user-select: none;
@@ -70,10 +86,12 @@ var width = (window.innerWidth > 0) ? window.innerWidth : screen.width,
     // radius = width / 2 - 20,
     radius = 70,
 	centerRad = 35,
-	centerDotRad = 35,
+	centerDotRad = 10,
 	buttonHeight = 25,
-	initTime = 200,
-	delayFactor = 30,
+	initTime = 150,
+	delayFactor = 10,
+	vertOffset = 100,
+	historyLength = 20,
 	letterAngles,
 	initArc,
 	transArc,
@@ -84,7 +102,12 @@ var width = (window.innerWidth > 0) ? window.innerWidth : screen.width,
 	color = d3.scale.ordinal()
     .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]),
   keyData,
-  keyboardCenter;
+  keyboardCenter,
+  touch = {
+  	list: [],
+  	isRecording: false,
+  	avg: [0,0]
+  };
 
 initArc = d3.svg.arc()
 	.outerRadius(centerRad)
@@ -107,34 +130,65 @@ pie = d3.layout.pie()
     .sort(null)
     .value(function(d) { return d.population; });
 
-// svg = d3.select("body").append("svg")
-//     .attr("width", width)
-//     .attr("height", height)
-//     .attr("class", "keyboard-container");
-  // .append("g")
-  //   .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
-
 function updateKeyboard () {
 	//TODO: remove this
 	removeKeyboard();
 
 	console.log("updateKeyboard keyboardCenter: ", keyboardCenter);
-	svg = d3.select("body")
-				.append("svg")
-				.style("top", keyboardCenter.y)
-				.style("left", keyboardCenter.x)
+	var body = d3.select('body');
+
+	svg = body.append("svg")
 				.style("height", radius * 2)
 				.style("width", radius * 2)
+				// .style('border', '1px solid black')
 				.attr("class", "keyboard-svg")
-				.style("transform", "translate(-50%, -50%)");
+				.style("transform", "translate(" + (parseInt(keyboardCenter.x) - radius) + "px," + (parseInt(keyboardCenter.y) - 3 * radius - vertOffset) + "px)");
+				// .on('touchmove', function () {
+				// 	//TODO: deal with multiple touch events at once
+				// 	var d = d3.touches(this)[0];
+				// 	console.log("touchmove d: ", d, ", distance: ", distance(d, touchCenter), ", touchCenter: ", touchCenter);
+				// 	if (distance(d, touchCenter) < centerDotRad) {
+				// 		//Inside center
+				// 		// update message and indicator isRecording: false
+				// 		if (touch.isRecording) {
+				// 			//add letter
+				// 			touch.list = [];
+				// 			touch.isRecording = false;
+				// 		}
+				// 	} else {
+				// 		// Outside center
+				// 		// collect touchHistory
+				// 		touch.list.push(d);
+				// 		touch.avg = touch.list.reduce(function (previousValue, currentValue, currentIndex, array) {
+				// 			return [previousValue[0] + currentValue[0], previousValue[1] + currentValue[1]];
+				// 		})
+				// 	}
+				// })
+				// .on('touchend', function () {
+
+				// });
 
 	var keyboard = svg
 				.append('g')
 				.attr("class", "keyboard")
 				.attr("transform", "translate(" + radius + "," + radius + ")");
-				// .attr("transform", "translate(" + keyboardCenter.x + "," + keyboardCenter.y + ")");
 
-	// svg.append("circle").attr("r", "50").attr("x", keyboardCenter.x).attr("y", keyboardCenter.y).style("fill", "black");
+	var feedback = keyboard.append('circle')
+				.attr("class", "feedback")
+				.attr("r", 5);
+
+	// var feedback = body.append('div')
+	// 			.attr("class", "feedback")
+	// 			.style("top", (keyboardCenter.y - vertOffset) + "px")
+	// 			.style("left", (keyboardCenter.x) + "px");
+
+	var thumb = body.append("div")
+		.attr("class", "thumb")
+		.style("width", centerDotRad + "px")
+		.style("height", centerDotRad + "px")
+		.style("border-radius", centerDotRad + "px")
+		.style("top", (keyboardCenter.y - centerDotRad / 2) + "px")
+		.style("left", (keyboardCenter.x - centerDotRad / 2) + "px");
 
 	var g,
 		center,
@@ -190,29 +244,16 @@ function updateKeyboard () {
 		.attr('y', height/2)
 		.attr('r', centerDotRad)
 		.style('fill', '#636363')
-		.attr("opacity", 1);
+		.attr("opacity", 0.3);
 
-	front = keyboard.append('circle')
-		.attr("class", 'front')
-		.attr("x", width/2)
-		.attr('y', height/2)
-		.attr("r", radius + 1)
-		.style("fill", '#454545')
-		.attr("opacity", 0.0000001)
-		.on('touchmove', mouseRecorder)
-		.on('touchend', stopRecording)
-		.on('click', function(d){
-			addSpace();
-			flash();
-		});
-		//.on('dblclick', addPeriod);
-					
 	//initialize letter angles
 	letterAngles = calcLetterAngles();
 }
 
 function removeKeyboard () {
 	var keyboard = d3.select('.keyboard-svg').remove();
+	var thumb = d3.select(".thumb").remove();
+	var feedback = d3.select(".feedback").remove();
 }
 
 
@@ -220,50 +261,111 @@ d3.csv("data.csv", function(error, data) {
 	keyData = data;
 });
 
-var clickTimeout;
+// var clickTimeout;
+var body = d3.select('body');
 
-d3.select('body').on('touchstart', function (event) {
+body.on('touchstart', function (event) {
 	
-	console.log("hey");
 	var d = d3.touches(this);
 	d = d[0] ? d[0] : d;
 	console.log("touchstart! event: ", d);
 
-	clickTimeout = setTimeout(function () {
+	// clickTimeout = setTimeout(function () {
 		keyboardCenter = {x: d[0], y: d[1]};
-		console.log("updateKeyboard called! keyboardCenter: ", keyboardCenter);
+		// console.log("updateKeyboard called! keyboardCenter: ", keyboardCenter);
 		updateKeyboard();
-		clickTimeout = null;
-	}, 350);
+		// clickTimeout = null;
+	// }, 350);
 });
 
-// d3.select('body').on('mousedown', function (event) {
-	
-// 	console.log("hey");
-// 	var d = d3.mouse(this);
-// 	// d = d[0] ? d[0] : d;
-// 	console.log("d3.mouse(this): ", d3.mouse(this));
-// 	console.log("d3.touch(this): ", d3.touch(this));
+body.on('touchmove', function () {
+	//TODO: deal with multiple touch events at once
+	var d = d3.touches(this)[0],
+			touchCenter = [keyboardCenter.x, keyboardCenter.y];
+	// console.log("touchmove d: ", d, ", distance: ", distance(d, touchCenter), ", touchCenter: ", touchCenter);
+	if (distance(d, touchCenter) < centerDotRad) {
+		//Inside center
+		// update message and indicator isRecording: false
 
-// 	clickTimeout = setTimeout(function () {
-// 		keyboardCenter = {x: d[0], y: d[1]};
-// 		console.log("updateKeyboard called! keyboardCenter: ", keyboardCenter);
-// 		updateKeyboard();
-// 		clickTimeout = null;
-// 	}, 350);
-// });
+			
+		if (touch.isRecording) {
+			var ang = avgAngle(touch.avg[0] - keyboardCenter.x, touch.avg[1] - keyboardCenter.y);
+			var closestLetter = findClosestLetter(ang);
+			addText(closestLetter);
 
-d3.select('body').on('touchend', function (event) {
-	console.log("dragend");
+			resetWedges();
+			//add letter
+			//reset touch values
+			touch.list = [];
+			touch.isRecording = false;
+		}
+
+		// d3.select('.feedback')
+		// 	.attr("cy", parseInt(d[1] - keyboardCenter.y) + "px")
+		// 	.attr("cx", parseInt(d[0] - keyboardCenter.x) + "px");
+	} else {
+		// Outside center
+		// collect touchHistory
+		touch.list.push(d);
+
+		if (touch.list.length > historyLength) {
+			touch.list.shift();
+		}
+		//Needed for real time feedback
+		var sum = [0,0],
+				t,
+				i;
+		for (i = 0; i < touch.list.length; i++) {
+			t = touch.list[i];
+			sum[0] += t[0];
+			sum[1] += t[1];
+		}
+		touch.avg = sum.map(function (dim) {
+			return dim / touch.list.length;
+		});
+
+
+
+		// touch.list.each(function (touch) {
+		// 	sum[0] += touch[0];
+		// 	// return [previousValue[0] + currentValue[0], previousValue[1] + currentValue[1]];
+		// });
+		// touch.avg = sum.map(function (dim) {
+		// 	return dim / touch.list.length;
+		// });
+
+
+		console.log("touch.avg: ", touch.avg);
+
+
+		var ang = avgAngle(touch.avg[0] - keyboardCenter.x, touch.avg[1] - keyboardCenter.y);
+
+		// console.log("ang: ", ang);
+		var letter = findClosestLetter(ang);
+		resetWedges();
+		emphasizeWedge(letter);
+
+		console.log("touch.avg: ", touch.avg, ", touchCenter: ", touchCenter);
+
+		// d3.select('.feedback')
+		// 	.attr("cy", parseInt(touch.avg[1] - keyboardCenter.y) + "px")
+		// 	.attr("cx", parseInt(touch.avg[0] - keyboardCenter.x) + "px");
+
+		touch.isRecording = true;
+	}
+
+	d3.select('.feedback')
+		.attr("cy", parseInt(d[1] - keyboardCenter.y) + "px")
+		.attr("cx", parseInt(d[0] - keyboardCenter.x) + "px");
+
+});
+
+body.on('touchend', function (event) {
+	// console.log("dragend");
 	
-	clearTimeout(clickTimeout);
 	removeKeyboard();
-	// touchendTimeout = setTimeout(function () {
-	// 	console.log("removing keyboard");
-	// 	removeKeyboard();
-	// 	touchendTimeout = null;
-	// }, 800);
-	
+
+	addSpace();
 });
 
 
