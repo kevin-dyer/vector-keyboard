@@ -57,19 +57,6 @@ form {
 }
 
 
-/*svg{
-	-webkit-user-select: none;
-	-khtml-user-select: none;
- 	-moz-user-select: none;
-  	-o-user-select: none;
-  	user-select: none;
-
-  	position:absolute;
-  	top: 120px;
-
-  	-webkit-user-select: none;  -khtml-user-select: none;   -moz-user-select: none; -o-user-select: none;    user-select: none;
-}*/
-
 .selectDisable {-webkit-user-select: none;  -khtml-user-select: none;   -moz-user-select: none; -o-user-select: none;    user-select: none; }
 
 .selectEnable { -webkit-user-select: text;  -khtml-user-select: text;   -moz-user-select: text; -o-user-select: text;    user-select: text; }
@@ -83,8 +70,8 @@ form {
 
 var width = (window.innerWidth > 0) ? window.innerWidth : screen.width,
     height = width,
-    radius = 70,
-	centerRad = 35,
+    radius = 100,
+	centerRad = 10,
 	centerDotRad = 7,
 	buttonHeight = 25,
 	initTime = 150,
@@ -127,7 +114,7 @@ largeArc = d3.svg.arc()
 
 pie = d3.layout.pie()
     .sort(null)
-    .value(function(d) { return d.population; });
+    .value(function(d) { return d.weight; });
 
 function updateKeyboard () {
 	//TODO: remove this
@@ -161,18 +148,20 @@ function updateKeyboard () {
 		.style("left", (keyboardCenter.x - centerDotRad / 2) + "px");
 
 	var g,
-		center,
-		front;
+			newG,
+			center;
 
 	g = keyboard.selectAll(".arc")
-    	.data(pie(keyData))
-    	.enter().append("g")
-    	.attr("class", "arc")
+    .data(pie(keyData));
+
+
+  newG = g.enter().append("g")
+    .attr("class", "arc")
 	
-	g.append("path")
+	newG.append("path")
 		.attr("class", "letterBox")
 		.attr("id", function(d, i){
-			return d.data.age;
+			return d.data.letter;
 		})
 		.style("fill", "#FFFFFF")
 		// .style("stroke", "#000")
@@ -191,10 +180,10 @@ function updateKeyboard () {
 			.duration(initTime)
 			.attr("d", arc);
 
-	g.append("text")
+	newG.append("text")
 		.attr("dy", ".35em")
 		.attr('id', function (d, i){
-			return 'txt'+d.data.age;
+			return 'txt'+d.data.letter;
 		})
 	    .style("text-anchor", "middle")
 		.style('font-size', 15)
@@ -205,7 +194,8 @@ function updateKeyboard () {
 			.delay(function(d, i){
 				return i * delayFactor + initTime;
 			})
-			.text(function(d) { return d.data.age; });
+			.text(function(d) { return d.data.letter; });
+
 		
 	center = keyboard.append('circle')
 		.attr('class', 'center')
@@ -219,6 +209,28 @@ function updateKeyboard () {
 	letterAngles = calcLetterAngles();
 }
 
+function augmentKeyboard (nextKeys) {
+	var keyboard = d3.select('.keyboard');
+			// letterBox = d3.selectAll(".letterBox");
+
+	g = keyboard.selectAll(".arc")
+    .data(pie(nextKeys));
+
+  g.each(function() {
+  	d3.select(this).select('.letterBox')
+  		.transition()
+			.duration(initTime)
+			.attr("d", arc);
+  });
+
+  // TODO: is this necessary?
+	// letterBox.transition()
+	// 		.duration(initTime)
+	// 		.attr("d", arc);
+
+	letterAngles = calcLetterAngles();
+}
+
 function removeKeyboard () {
 	var keyboard = d3.select('.keyboard-svg').remove();
 	var thumb = d3.select(".thumb").remove();
@@ -228,6 +240,7 @@ function removeKeyboard () {
 
 d3.csv("data.csv", function(error, data) {
 	keyData = data;
+	console.log("keyData: ", keyData);
 });
 
 // var clickTimeout;
@@ -273,6 +286,11 @@ body.on('touchmove', function () {
 			var letter = findClosestLetter(ang);
 			resetWedges();
 			emphasizeWedge(letter);
+
+
+			//TEST
+			keyData[0].weight = 3;
+			augmentKeyboard(keyData);
 		}
 
 		touch.isRecording = true;
@@ -400,8 +418,8 @@ function calcLetterAngles () {
 		adjAngle = letterAngle  < 0 
 			? 2 * pi + letterAngle
 			: letterAngle;
-		letterAngles1.push({letter: d.data.age, angle: adjAngle});
-		//console.log("letter: ", d.data.age, ", angle: ", adjAngle);
+		letterAngles1.push({letter: d.data.letter, angle: adjAngle});
+		//console.log("letter: ", d.data.letter, ", angle: ", adjAngle);
 	});
 	return letterAngles1;
 }
