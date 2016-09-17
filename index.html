@@ -1,703 +1,475 @@
 <!DOCTYPE html>
+
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/> <!--320-->
+
 <style>
 
-rect {
-  fill: none;
-  pointer-events: all;
+html, body {
+	height: 100%;
+	width: 100%;
+}
+body {
+  font: 15px sans-serif;
+  overflow: hidden;
+  margin:0;
+  padding:0;
+  position: fixed;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+ 	-moz-user-select: none;
+  	-o-user-select: none;
+  	user-select: none;
 }
 
-.node {
-  fill: #000;
+.arc path {
+  stroke: #fff;
 }
 
-.cursor {
-  fill: none;
-  stroke: brown;
-  pointer-events: none;
-}
+form {
+	margin:0;
+	padding:0;
 
-.link {
-  stroke: #999;
 }
-body svg{
-	cursor: crosshair;
-
-	margin:20px;
-	margin-top:0;
-}
-
-.meassageBox{
-	width:795px;
+.messageBox{
+	width:100%;
 	font-size:23px;
-	height:100px;
-	margin:20px;
-	margin-bottom:0;
+	height:120px;
+	border: none;
+	/*padding: 20px;*/
 }
+
+.keyboard-svg {
+	position: absolute;
+}
+
+.thumb {
+	position: absolute;
+	background-color: black;
+}
+
+.feedback {
+	position: absolute;
+	background-color: black;
+	width: 5px;
+	height: 5px;
+	border-radius: 5px;
+}
+
+
+.selectDisable {-webkit-user-select: none;  -khtml-user-select: none;   -moz-user-select: none; -o-user-select: none;    user-select: none; }
+
+.selectEnable { -webkit-user-select: text;  -khtml-user-select: text;   -moz-user-select: text; -o-user-select: text;    user-select: text; }
+
 
 </style>
+
 <body>
-	<form>
-		<textarea id='message' class='meassageBox' type='text' autocomplete="on" autocorrect="on" autocapitalize="off" spellcheck="on" placeholder="Write your message here. Click center circle once for space and double click for a period."></textarea>
-	</form>
-<script src="d3.min.js"></script>
+<script src="./d3.min.js"></script>
 <script>
-document.getElementById('message').focus();
-var width = 800,
-    height = 370;
 
-	var let = {
-		Q: 0,
-		A: 1,
-		W: 2,
-		S: 3,
-		E: 4,
-		D: 5,
-		R: 6,
-		F: 7,
-		T: 8,
-		G: 9,
-		Y: 10,
-		H: 11,
-		U: 12,
-		J: 13,
-		I: 14,
-		K: 15,
-		O: 16,
-		L: 17,
-		P: 18,
-		X: 19,
-		N: 20,
-		C: 21,
-		M: 22,
-		V: 23,
-		Z: 24,
-		B: 25
-	};
+var width = (window.innerWidth > 0) ? window.innerWidth : screen.width,
+    height = width,
+    radius = 100,
+	centerRad = 10,
+	centerDotRad = 7,
+	buttonHeight = 25,
+	initTime = 150,
+	delayFactor = 10,
+	vertOffset = 100,
+	historyLength = 20,
+	letterAngles,
+	initArc,
+	transArc,
+	arc,
+	largeArc,
+	pie,
+	svg,
+	color = d3.scale.ordinal()
+    .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]),
+  keyData,
+  keyboardCenter,
+  touch = {
+  	highestPt: null,
+  	furthestDist: 0,
+  	isRecording: false,
+  };
+
+initArc = d3.svg.arc()
+	.outerRadius(centerRad)
+	.innerRadius(centerRad - 10);
+
+transArc = d3.svg.arc()
+	.outerRadius(radius)
+	.innerRadius(radius - 10);
+
+arc = d3.svg.arc()
+    	.outerRadius(radius)
+    	.innerRadius(radius - buttonHeight);
+
+largeArc = d3.svg.arc()
+		.outerRadius(radius + 10)
+		.innerRadius(0);
+		
+
+pie = d3.layout.pie()
+    .sort(null)
+    .value(function(d) { return d.weight; });
+
+function updateKeyboard () {
+	//TODO: remove this
+	removeKeyboard();
+
+	console.log("updateKeyboard keyboardCenter: ", keyboardCenter);
+	var body = d3.select('body');
+
+	svg = body.append("svg")
+				.style("height", radius * 2)
+				.style("width", radius * 2)
+				// .style('border', '1px solid black')
+				.attr("class", "keyboard-svg")
+				.style("transform", "translate(" + (parseInt(keyboardCenter.x) - radius) + "px," + (parseInt(keyboardCenter.y) - 3 * radius - vertOffset) + "px)");
+
+	var keyboard = svg
+				.append('g')
+				.attr("class", "keyboard")
+				.attr("transform", "translate(" + radius + "," + radius + ")");
+
+	var feedback = keyboard.append('circle')
+				.attr("class", "feedback")
+				.attr("r", 5);
+
+	var thumb = body.append("div")
+		.attr("class", "thumb")
+		.style("width", centerDotRad + "px")
+		.style("height", centerDotRad + "px")
+		.style("border-radius", centerDotRad + "px")
+		.style("top", (keyboardCenter.y - centerDotRad / 2) + "px")
+		.style("left", (keyboardCenter.x - centerDotRad / 2) + "px");
+
+	var g,
+			newG,
+			center;
+
+	g = keyboard.selectAll(".arc")
+    .data(pie(keyData));
+
+
+  newG = g.enter().append("g")
+    .attr("class", "arc")
 	
-	var graph = {
-		  "nodes":[
-		    {"name":"Q"},
-		    {"name":"A"},
-		    {"name":"W"},
-		    {"name":"S"},
-		    {"name":"E"},
-		    {"name":"D"},
-		    {"name":"R"},
-		    {"name":"F"},
-			{"name":"T"},
-			{"name":"G"},
-			{"name":"Y"},
-			{"name":"H"},
-			{"name":"U"},
-			{"name":"J"},
-			{"name":"I"},
-			{"name":"K"},
-			{"name":"O"},
-			{"name":"L"},
-			{"name":"P"},
-			{"name":"X"},
-			{"name":"N"},
-			{"name":"C"},
-			{"name":"M"},
-			{"name":"V"},
-			{"name":"Z"},
-			{"name":"B"},
-			{"name":'center', "x": width/2, 'y': height/2, "fixed":true}
-		  ],
-		  "links":[
-		    {"source":26,"target":0},
-		    {"source":26,"target":1},
-		    {"source":26,"target":2},
-		    {"source":26,"target":3},
-		    {"source":26,"target":4},
-		    {"source":26,"target":5},
-		    {"source":26,"target":6},
-		    {"source":26,"target":7},
-		    {"source":26,"target":8},
-		    {"source":26,"target":9},
-		    {"source":26,"target":10},
-		    {"source":26,"target":11},
-		    {"source":26,"target":12},
-		    {"source":26,"target":13},
-		    {"source":26,"target":14},
-		    {"source":26,"target":15},
-		    {"source":26,"target":16},
-		    {"source":26,"target":17},
-		    {"source":26,"target":18},
-		    {"source":26,"target":19},
-		    {"source":26,"target":20},
-		    {"source":26,"target":21},
-		    {"source":26,"target":22},
-		    {"source":26,"target":23},
-			{"source":26,"target":24},
-		    {"source":26,"target":25},
-			//internal structure
-			// {"source":let["A"],"target":let["D"]},
-			// {"source":let["A"],"target":let["W"]},
-			// {"source":let["D"],"target":let["W"]},
-			// 
-			// {"source":let["D"],"target":let["F"]},
-			// {"source":let["D"],"target":let["E"]},
-			// {"source":let["F"],"target":let["E"]},
-			// 
-			// {"source":let["F"],"target":let["G"]},
-			// {"source":let["F"],"target":let["R"]},
-			// {"source":let["R"],"target":let["G"]},
-			// 
-			// {"source":let["G"],"target":let["H"]},
-			// {"source":let["G"],"target":let["T"]},
-			// {"source":let["T"],"target":let["H"]},
-			// 
-			// {"source":let["H"],"target":let["K"]},
-			// {"source":let["H"],"target":let["Y"]},
-			// {"source":let["K"],"target":let["Y"]},
-			// 
-			// {"source":let["K"],"target":let["J"]},
-			// {"source":let["K"],"target":let["U"]},
-			// {"source":let["J"],"target":let["U"]},
-			// 
-			// {"source":let["J"],"target":let["L"]},
-			// {"source":let["J"],"target":let["I"]},
-			// {"source":let["L"],"target":let["I"]},
-			// 
-			// {"source":let["L"],"target":let["V"]},
-			// {"source":let["L"],"target":let["O"]},
-			// {"source":let["V"],"target":let["O"]},
-			// 
-			// {"source":let["V"],"target":let["B"]},
-			// {"source":let["V"],"target":let["P"]},
-			// {"source":let["B"],"target":let["P"]},
-			// 
-			// {"source":let["B"],"target":let["C"]},
-			// {"source":let["B"],"target":let["X"]},
-			// {"source":let["C"],"target":let["X"]},
-			// 
-			// {"source":let["X"],"target":let["S"]},
-			// {"source":let["X"],"target":let["Z"]},
-			// {"source":let["S"],"target":let["Z"]},
-			// 
-			// {"source":let["S"],"target":let["A"]},
-			// {"source":let["S"],"target":let["Q"]},
-			// {"source":let["A"],"target":let["Q"]},
-			// 
-			// {"source":let["C"],"target":let["M"]},
-			// {"source":let["C"],"target":let["N"]},
-			// {"source":let["M"],"target":let["N"]},
-			// 
-			// {"source":let["N"],"target":let["Z"]},
-			// {"source":let["M"],"target":let["P"]}
-		  ]
-	};
-	
-	
-	var presetPosition = {
-	Q : {x:  301.5310446284845 , y:  275.8936718790671 },
-	A : {x:  310.677126197509 , y:  155.01747430020697 },
-	W : {x:  273.14847839083376 , y:  228.84292580456707 },
-	S : {x:  308.0029040874439 , y:  203.00183900545824 },
-	E : {x:  266.71474158941936 , y:  169.06112838157344 },
-	D : {x:  335.7655671511787 , y:  115.52276804042424 },
-	R : {x:  288.1157545648558 , y:  110.61509657766364 },
-	F : {x:  421.54296438199657 , y:  93.14883170951323 },
-	T : {x:  333.83976045998065 , y:  68.01262472415243 },
-	G : {x:  376.2582290535937 , y:  93.41034183841279 },
-	Y : {x:  394.9309890802256 , y:  50.41675421446327 },
-	H : {x:  462.4422523362776 , y:  114.46463921088574 },
-	U : {x:  458.58376491798714 , y:  64.02188566104742 },
-	J : {x:  488.5051455761523 , y:  153.91914875289964 },
-	I : {x:  506.9769889934271 , y:  104.05754211728514 },
-	K : {x:  490.6379611873906 , y:  203.6140194615778 },
-	O : {x:  531.6644128440114 , y:  160.4548387210977 },
-	L : {x:  464.03194647191265 , y:  251.20183920717238 },
-	P : {x:  529.7780005394713 , y:  217.50501243830746 },
-	X : {x:  377.585580104302 , y:  276.12661386329626 },
-	N : {x:  464.960346263909 , y:  300.7781616887382 },
-	C : {x:  333.4088975758701 , y:  249.74053732603645 },
-	M : {x:  506.5383356738919 , y:  265.22756845626446 },
-	V : {x:  420.1609704938488 , y:  277.2059510824006 },
-	Z : {x:  349.47016957560606 , y:  308.024232762011 },
-	B : {x:  410.9249880797795 , y:  336.33320129644346 },
-	center : {x:  400 , y:  185 },
-	};
-	
-for(var i = 0; i < graph.nodes.length; i++){
-	graph.nodes[i].x = presetPosition[graph.nodes[i].name].x;
-	graph.nodes[i].y = presetPosition[graph.nodes[i].name].y;
-	graph.nodes[i].px = presetPosition[graph.nodes[i].name].px;
-	graph.nodes[i].py = presetPosition[graph.nodes[i].name].py;
+	newG.append("path")
+		.attr("class", "letterBox")
+		.attr("id", function(d, i){
+			return d.data.letter;
+		})
+		.style("fill", "#FFFFFF")
+		// .style("stroke", "#000")
+		// .style("stroke-width", 1)
+    	.attr("d", initArc)
+		.transition()
+			.delay(function (d, i) {
+				return i * delayFactor;
+			})
+			.duration(initTime)
+			.attr('d', transArc)
+		.transition()
+			.delay(function(d, i){
+				return i * delayFactor + initTime;
+			})
+			.duration(initTime)
+			.attr("d", arc);
+
+	newG.append("text")
+		.attr("dy", ".35em")
+		.attr('id', function (d, i){
+			return 'txt'+d.data.letter;
+		})
+	    .style("text-anchor", "middle")
+		.style('font-size', 15)
+		.style('fill', '#000000')
+		.attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
+		.transition()
+			.duration(initTime)
+			.delay(function(d, i){
+				return i * delayFactor + initTime;
+			})
+			.text(function(d) { return d.data.letter; });
+
+		
+	center = keyboard.append('circle')
+		.attr('class', 'center')
+		.attr("x", width/2)
+		.attr('y', height/2)
+		.attr('r', centerDotRad)
+		.style('fill', '#636363')
+		.attr("opacity", 0.3);
+
+	//initialize letter angles
+	letterAngles = calcLetterAngles();
+}
+
+function augmentKeyboard (nextKeys) {
+	var keyboard = d3.select('.keyboard');
+			// letterBox = d3.selectAll(".letterBox");
+
+	g = keyboard.selectAll(".arc")
+    .data(pie(nextKeys));
+
+  g.each(function() {
+  	d3.select(this).select('.letterBox')
+  		.transition()
+			.duration(initTime)
+			.attr("d", arc);
+  });
+
+  // TODO: is this necessary?
+	// letterBox.transition()
+	// 		.duration(initTime)
+	// 		.attr("d", arc);
+
+	letterAngles = calcLetterAngles();
+}
+
+function removeKeyboard () {
+	var keyboard = d3.select('.keyboard-svg').remove();
+	var thumb = d3.select(".thumb").remove();
+	var feedback = d3.select(".feedback").remove();
 }
 
 
-//var filltemp = d3.scale.category20();
-var fillRange = ['rgb(178,24,43)','rgb(214,96,77)','rgb(244,165,130)','rgb(253,219,199)','rgb(247,247,247)','rgb(209,229,240)','rgb(146,197,222)','rgb(67,147,1950)','rgb(33,102,172)']
-var fillScale = d3.scale.pow().exponent(4)
-					.domain([10,30])
-					.range([fillRange.length, 0]);
+d3.csv("data.csv", function(error, data) {
+	keyData = data;
+	console.log("keyData: ", keyData);
+});
 
-var scaleRadius = d3.scale.pow().exponent(3)
-                    .domain([0, 120])
-                    .range([30, 10]);
+// var clickTimeout;
+var body = d3.select('body');
 
-var ll=0;
+body.on('touchstart', function (event) {
+	
+	var d = d3.touches(this);
+	d = d[0] ? d[0] : d;
+	console.log("touchstart! event: ", d);
 
+	keyboardCenter = {x: d[0], y: d[1]};
+	updateKeyboard();
+});
 
-
-var force = d3.layout.force()
-    .size([width, height])
-    .nodes(graph.nodes)
- 	.links(graph.links)// initialize with a single node
-    .linkDistance(function(){
-		//console.log('ll: '+ linkerLength[ll]);
-		//return linkerLength[ll++];
-		
-		//return linkerLength[ll++];
-		if(ll < 25){
-			return ll++ % 2 ? 90 : 120;
-		}else{
-			return 140;
-			//return 40;
+body.on('touchmove', function () {
+	//TODO: deal with multiple touch events at once
+	var d = d3.touches(this)[0],
+			touchCenter = [keyboardCenter.x, keyboardCenter.y];
+	// console.log("touchmove d: ", d, ", distance: ", distance(d, touchCenter), ", touchCenter: ", touchCenter);
+	if (distance(d, touchCenter) < centerDotRad) {
+		//Inside center
+		if (touch.isRecording) {
+			var ang = avgAngle(touch.highestPt[0] - keyboardCenter.x, touch.highestPt[1] - keyboardCenter.y);
+			var letter = findClosestLetter(ang);
+			addText(letter);
+			resetWedges();
+			//add letter
+			//reset touch values
+			touch.furthestDist = 0;
+			touch.highestPt = null;
+			touch.isRecording = false;
 		}
-		
-	})
-    .charge(-200)
-    .on("tick", tick);
 
-var svg = d3.select("body").append("svg")
-    .attr("width", width)
-    .attr("height", height)
-    .on("mousemove", mousemove)
-    .on("mousedown", mousedown);
+	} else {
 
-var rect = svg.append("rect")
-    .attr("width", width)
-    .attr("height", height);
+		var tmpDist = distance(d, touchCenter);
+		if (tmpDist >= touch.furthestDist) {
+			touch.furthestDist = tmpDist;
+			touch.highestPt = d;
 
-var refLink = svg.append('line').attr('class', 'refLink')
-	.attr("x2", width / 2)
-	.attr("y2", height / 2);
-	// .attr('opacity', function(d){
-	// 		console.log("d.x2: "+ d.target);
-	// 		return 1;
-	// 			//return distance(d.target.x, d.source.y, d.target.y, d.source.y);
-	// 		});
+			var ang = avgAngle(touch.highestPt[0] - keyboardCenter.x, touch.highestPt[1] - keyboardCenter.y);
+			var letter = findClosestLetter(ang);
+			resetWedges();
+			emphasizeWedge(letter);
 
-	// var txtArea = svg.append("text")
-	// 	.attr("class", "messageBox")
-	// 	.attr("width", 200)
-	// 	.attr("height", 100)
-	// 	.attr("font-size", 24)
-	// 	.style("stroke", "black")
-	// 	.style("stroke-width", 1)
-	// 	.style('fill', 'black')
-	// 	.attr("transform", "translate(50, "+ (height - 50) +")");
-var nodes = force.nodes(),
-    links = force.links(),
-    node = svg.selectAll(".node"),
-    link = svg.selectAll(".link");
+
+			//TEST
+			keyData[0].weight = 3;
+			augmentKeyboard(keyData);
+		}
+
+		touch.isRecording = true;
+	}
+
+	d3.select('.feedback')
+		.attr("cy", parseInt(d[1] - keyboardCenter.y) + "px")
+		.attr("cx", parseInt(d[0] - keyboardCenter.x) + "px");
+
+});
+
+body.on('touchend', function (event) {
+	// console.log("dragend");
+	
+	removeKeyboard();
+
+	addSpace();
+});
 
 
 
-// var cursor = svg.append("circle")
-//     .attr("r", 10)
-//     .attr("transform", "translate(-100,-100)")
-//     .attr("class", "cursor");
+var avgData = {xSum: 0, ySum: 0, total: 0, log:[]},
+	inCenter = false;
 
+function stopRecording () {
+	var ang,
+		closestLetter,
+		yScaleFactor = 1;
 
-
-restart();
-
-function tick() {
-
-
-
-	node.attr("transform", function(d) {
-			return 'translate(' + [d.x, d.y] + ')';
-		});
-		
-	svg.selectAll(".circle")
-		.attr("r", function(d){
-			// if (d.name === 'center' || d.name === 'cursor'){
-			// 				return 20;
-			// 			}
-
-			return parseFloat(d.r);
-		})
-		.style("fill", function(d, i) {
-			return fillRange[parseInt(fillScale(d.r))] || "#FFFFFF";
-		});
-		
-	  link.attr("x1", function(d) { return d.source.x; })
-	      .attr("y1", function(d) { return d.source.y; })
-	      .attr("x2", function(d) { return d.target.x; })
-	      .attr("y2", function(d) { return d.target.y; })
-			.style("opacity", function (d) {
-				return (d.target.r - 5) / 300;
-			})
+	console.log("stopRecording");
+	resetWedges();
+	if (!avgData.total) {
+		return;
+	}	
+	ang = avgAngle((avgData.xSum / avgData.total), (avgData.ySum * yScaleFactor / avgData.total));
+	closestLetter = findClosestLetter(ang);
+	addText(closestLetter);
+	avgData = {xSum: 0, ySum: 0, total: 0, log:[]};
 }
 
-function restart() {
-	ll=0;
-  link = link.data(links);
-
-  link.enter().insert("line", ".node")
-      .attr("class", "link")
-		.style("stroke", "black")
-		.style("stroke-width", 2)
-		.attr("opacity", 0);
-
-  node = node.data(nodes);
-	var g = node.enter().append("g")
-		.attr("class", "node")
-		.attr("x", function(d){
-			return presetPosition[d.name].x;
-		})
-		.attr("y", function(d){
-			return presetPosition[d.name].y;
-		})
-		.attr("px", function(d){
-			return presetPosition[d.name].x;
-		})
-		.attr("py", function(d){
-			return presetPosition[d.name].y;
-		})
-		.call(force.drag);
-		
-	g.append("circle").attr("r", function(d){
-		return d.r;
-	})
-		.attr("class", function(d){
-			return d.name === 'center' ? 'center' : 'circle';
-		})
-		// .style("stroke", "black")
-		// 		.style("stroke-width", 1.5)
-		.style("fill", "white")
-		.attr('opacity', function(d){
-			return d.name === 'center' ? 1 : 0.1;
-		});
-		
-		
-	g.append("text")
-			.attr("class", "title")
-			.style("font-size", 25)
-			.style("stroke", "black")
-			.style("fill", "black")
-			.text(function(d){
-				return d.name === 'center' ? '' : d.name;
-			})
-			.attr("transform", "translate(-8,8)");
-						
-	var center = svg.select('.center').style('fill', '#D4D4D4')
-		.attr('r', 40)
-		.on('mouseleave', startRecord)
-		.on('mouseenter', stopRecord)
-		.on('click', function(d){
-			addSpace();
-			flash();
-			// **** KEEP FOR REPOSITIONING LETTERS *****//
-			// console.log("var presetPosition = {");
-			// 			svg.selectAll('.node').each(function(d){
-			// 				console.log(d.name, ": {x: ", d.x, ", y: ", d.y, "},");
-			// 			});
-			// 			console.log("};");
-		})
-		.on('dblclick', addPeriod);
-
-			
-			
-
-  force.start();
-}
-
-
-function mousemove() {
-  //cursor.attr("transform", "translate(" + d3.mouse(this) + ")");
-
+function mouseRecorder () {
+	// console.log("mouseRecorder");
 	var point = d3.mouse(this),
-		hand = {x: point[0], y: point[1]};
-		
-		
-		
-	//nodes.forEach(function(d, i) {
-	nodes.forEach(function(d,i){ 
-		var x1 = d.x,
-		  	x2 = hand.x,
-			y1 = d.y,
-			y2 = hand.y;
-		
-		d.r = Math.max(scaleRadius(distance(d.x, hand.x, d.y, hand.y)), 7);
-		//console.log("d.r = "+ d.r);
-		
+		hand = {x: point[0], y: point[1]},
+		tmp,
+		ang,
+		letter;
+
+		console.log("d3.touches(this): ", d3.touches(this));
+
+	if (isInCenter(point)) {
+		stopRecording();
+		return;
+	}
+	avgData.xSum += hand.x;
+	avgData.ySum += hand.y;
+	avgData.total++;
+	avgData.log.push(hand);
+	while (avgData.log.length > 30) {
+		tmp = avgData.log.shift();
+		avgData.xSum -= tmp.x;
+		avgData.ySum -= tmp.y;
+		avgData.total--; 
+	}
+
+	// console.log("avgData.xSum: ", avgData.xSum, ", avgData.total: ", avgData.total);
+	// console.log("avgData.ySum: ", avgData.ySum);
+	console.log("yAvg ", avgData.ySum / avgData.total);
+	// console.log("keyboardCenter: ", keyboardCenter);
+	console.log("diffX: ", (avgData.xSum / avgData.total) - keyboardCenter.x, ", diffY: ", (avgData.ySum / avgData.total) - keyboardCenter.y);
+	ang = avgAngle((avgData.xSum / avgData.total) - keyboardCenter.x, (avgData.ySum / avgData.total) - keyboardCenter.y);
+
+	// console.log("ang: ", ang);
+	letter = findClosestLetter(ang);
+	resetWedges();
+	emphasizeWedge(letter);
+}
+
+function isInCenter (point) {
+	if (distance(point, [keyboardCenter.x, keyboardCenter.y]) <= centerDotRad) {
+	// if (distance(point, [0, 0]) <= centerDotRad) {
+		console.log("isInCenter: true");
+		return true;
+	}
+	console.log("isInCenter: false");
+	return false;
+}
+
+function distance (point1, point2) {
+	//need this scale factor because d3.mouse is off in y direction
+	var yScaleFactor = 4;
+	return Math.sqrt(Math.pow((point1[0] - point2[0]), 2) + yScaleFactor * (Math.pow((point1[1] - point2[1]), 2)));
+}
+
+function centerClick () {
+	console.log("centerClick");
+}
+
+function centerDblClick () {
+	console.log("centerDblClick");
+}
+
+function findClosestLetter (angle) {
+	var length = letterAngles.length,
+		i,
+		closestLetter = letterAngles[0];
+
+	for (i = 1; i < length; i++) {
+		if (Math.abs(closestLetter.angle - angle) > Math.abs(letterAngles[i].angle - angle)) {
+			closestLetter = letterAngles[i];
+		}
+	}
+	return closestLetter.letter;
+}
+
+
+function calcLetterAngles () {
+	var letterAngles1 = [],
+		letterAngle,
+		adjAngle,
+		pi = Math.PI;
+
+	d3.selectAll('text').each(function(d){
+		letterAngle = 0.5 * pi - ((d.startAngle + d.endAngle) / 2);
+		adjAngle = letterAngle  < 0 
+			? 2 * pi + letterAngle
+			: letterAngle;
+		letterAngles1.push({letter: d.data.letter, angle: adjAngle});
+		//console.log("letter: ", d.data.letter, ", angle: ", adjAngle);
 	});
-	
-	restart();
+	return letterAngles1;
 }
 
-function distance(x1, x2, y1, y2){
-	return (Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)));
+function avgAngle (x, y) {
+	var halfAngle = Math.atan2((-1*y), x);
+		return halfAngle >= 0 ? halfAngle : Math.PI * 2 + halfAngle;
 }
 
-function mousedown() {
-	
-}
-
-
-//var data = [];
-var avgData = {xSum: 0, ySum: 0, total: 0};
-function startRecord(){
-	var outOfBounds = 0;
-	svg.on('mousemove', function(evt){
-		var point = d3.mouse(this),
-			hand = {x: point[0], y: point[1]};
-		
-		// var avgX = 0, avgY = 0,
-		// 			refLink = svg.select(".refLink");
-		// 		if(data.length){
-		// 			
-		// 			for(var i = 0; i < data.length; i++){
-		// 				avgX += data[i].x;
-		// 				avgY += data[i].y;
-		// 				//console.log("avgX: ", avgX, ", avgY: ", avgY );
-		// 			}
-		// 			avgX /= data.length;
-		// 			avgY /= data.length;
-		if(avgData.total){
-			refLink
-				.attr("x1", (avgData.xSum / avgData.total))
-				.attr("y1", (avgData.ySum / avgData.total))
-				//.attr("x1", hand.x)
-				//.attr("y1", hand.y)
-				.style('stroke', 'black')
-				.style('stroke-width', 1.5);
-		}
-		
+function resetWedges () {
+	svg.selectAll('.letterBox')
+		.transition()
+			.duration(50)
+			.attr('d', arc)
+			.style('fill', "#FFFFFF")
+			.style('stroke', "");
 			
-		if(distance (hand.x, (width/2), hand.y, (height/2)) > 150){
-			//data = [];
-			avgData.xSum = 0;
-			avgData.ySum = 0;
-			avgData.total = 0;
-			refLink.attr("opacity", 0.00001)
-				.attr("x1", width/2)
-				.attr("y1", height/ 2);
-			outOfBounds = 1;
-			return;
-		}else{refLink.attr("opacity", 1);};
-		if(!outOfBounds){
-			//data.push(hand);
-			avgData.xSum += hand.x;
-			avgData.ySum += hand.y;
-			avgData.total++;
-		}
-		
-		nodes.forEach(function(d,i){ 
-			var x = d.x - hand.x,
-			y = d.y - hand.y;
-
-			d.r = Math.max(scaleRadius(distance(d.x, hand.x, d.y, hand.y)), 5);
-		});
-
-		restart();
-			
-			// var traceArry = svg.selectAll('.trace');
-			// 		var lastTrace = traceArry[0];
-			// 		console.log("lastTrace length: " + traceArry.attr("class"));
-			
-			// var center = svg.selectAll('.center').each(function(d){
-			// 				return {x: d.x, y: d.y};
-			// 			});
-			// 			console.log("center:"+center.x);
-			// 			
-			// 			var trace = svg.append('circle').attr("class", "trace")
-			// 				.attr('r', 2)
-			// 				.attr("cx", hand.x)
-			// 				.attr('cy', hand.y)
-			// 				.style('fill', '#454545')
-			// 				.attr("opacity", 1)
-			// 				.transition()
-			// 					.duration(1000)
-			// 					.attr('opacity',0.00000001)
-			// 					.remove();
-			// 					
-			// 			var traceLine = svg.append('line').attr("class", "traceLine")
-			// 				.attr("x1", center.x)
-			// 				.attr("y1", center.y)
-			// 				.attr("x2", trace.x)
-			// 				.attr("y2", trace.y)
-			// 				.style('stroke', 'black')
-			// 				.style('stroke-width', 1)
-			// 				.attr("opacity",1)
-			// 				.transition()
-			// 					.duration(1000)
-			// 					.attr('opacity',0.00000001)
-			// 					.remove();
-		//test
-		//console.log("x: ", hand.x - width/ 2, ", y: ", -1*(hand.y - height/2));
-		//console.log("angle: ", (-1*(hand.y - height/2)) / (hand.x - width/ 2));
-		//console.log("degrees: ", Math.atan2((-1*(hand.y - height/2)), (hand.x - width/ 2)));
-		//console.log("degrees: ", (180/3.14) * Math.atan((-1*(hand.y - height/2)) / (hand.x - width/ 2)));
-		//console.log('degrees: ', 57.2957795 * (Math.atan2((-1*(hand.y - height/2)), (hand.x - width/ 2))));
-		//console.log("bottom left: ", 57.2957795 * (Math.atan2(-1, -1)));
-		
-		
-		// var halfAngle = 57.2957795 * (Math.atan2((-1*(hand.y - height/2)), (hand.x - width/ 2))),
-		// 					fullAngle = halfAngle >= 0 ? halfAngle : 360 + halfAngle;
-		// 				console.log("fullAngle: ", fullAngle);
-		
-		
-		//console.log("x: "+point[0]+", y:"+point[1]);
-		
-		//cursor.attr("transform", "translate(" + d3.mouse(this) + ")");
-			//nodes.forEach(function(d, i) {
-			
-		
-	});
-}
-function stopRecord(){
-	//clearTimeout(timer);
-	svg.on('mousemove', mousemove);
-	
-	//do not choose letter if first time entering center
-	if (!avgData.total) return;
-	
-	// if (!data.length){
-	// 		return;
-	// 	}
-	
-	//var angles = getLetterAngle();
-	getLetterAngle();
-	
-	svg.select(".refLink").attr("opacity", 0.0001);
-	
-	// var xavg=0,
-	// 		yavg=0,
-	// 		i,
-	// 		//n = data.length,
-	// 		n= avgData.total;
-	// 		center,
-	// 		centerX,
-	// 		centerY,
-	// 		slope;
-	// for(i = 0; i < n; i++){
-	// 		xavg += parseFloat(data[i].x);
-	// 		yavg += parseFloat(data[i].y);
-	// 	}
-	// 	xavg /= n;
-	// 	yavg /= n;
-	
-	//remove previous refPt
-	var pt = svg.select('.refPt').remove();
-	
-	// if (pt){
-	// 		pt.remove();
-	// 	}else{
-	// 		//return;
-	// 	} 
-	// svg.select('.refLinker').remove();
-	// 	var ref = svg.append('circle').attr('class', 'refPt')
-	// 		.attr("r", 2)
-	// 		.attr('cx', xavg)
-	// 		.attr('cy', yavg)
-	// 		.style('fill', 'black');
-		//.style('stroke', '#000000');
-		//.style('stroke-width', 1.5);
-	//create link to center
-	//var center = svg.select('circle.center');
-	// svg.append('line').attr("x1", xavg)
-	// 		.attr("y1", yavg)
-	// 		.attr("x2", width/2)
-	// 		.attr("y2", height/2)
-	// 		.attr("class", 'refLinker')
-	// 		.style('stroke', 'black')
-	// 		.style('stroke-width', 0.5);
-		
-	//	console.log("linker: ", document.getElementsByClassName('linker').length);
-		
-	//center = svg.select('circle.center');
-	//center = document.getElementsByClassName('center')[0];
-	//console.log("center length: ", center.length);
-	
-	// centerX = center.getAttribute('cx');
-	// 	centerY = center.getAttribute('cy');
-	// 	console.log("center x,y = ", centerX, ", ", centerY);
-
-	//console.log("xavg = ", xavg, ", yavg ", yavg);
-	//data = [];
-	
-	var xavg = avgData.xSum / avgData.total;
-	var yavg = avgData.ySum / avgData.total;
-	
-	avgData.xSum = 0;
-	avgData.ySum = 0;
-	avgData.total = 0;
-	
-	
-	//find angle of xavg, yavg
-	var angleAvg = xyToAngle(xavg, yavg);
-	var closestLetter;
-	svg.selectAll('.node').each(function(d){
-		//console.log(d.name ,".angle: ", d.angle );
-		if( d.name === 'center'){
-			return;
-			console.log("skipping center");
-		}
-		if (!closestLetter) {
-			closestLetter = d;
-			//console.log("init closestLetter to d: ", d.name);
-			return;
-		}
-		var diffAngle = Math.abs(angleAvg - d.angle);
-		var closestDiff = Math.abs(angleAvg - closestLetter.angle);
-		if (diffAngle < closestDiff){
-			//console.log("closest so far: ", closestLetter.name, ", diffAngle: "+ parseFloat(angleAvg) - parseFloat(d.angle));
-			//console.log("angleAvg: ", parseFloat(angleAvg));
-			//console.log("d.angle: ", parseFloat(d.angle));
-			//console.log("diffAngle: ", Math.abs(angleAvg - d.angle));
-			
-			closestLetter = d;
-		}
-	});
-	//console.log(closestLetter.name);
-	//console.log("currentText = "+ currentText);
-	// var currentText = document.getElementsByClassName('messageBox')[0].innerHTML;
-	// console.log("currentText: "+ currentText);
-	// txtArea.text(function(d){
-	// 	return currentText + closestLetter.name;
-	// });
-	var nextLetter = 
-	addText(closestLetter.name);
-	
+	svg.selectAll('text').style('fill', '#000000')
+		.style("font-size", 15)
+		.attr("dy", ".35em");
 }
 
-// function wayPoint (){
-// 	var point = d3.mouse(this),
-// 		hand = {x: point[0], y: point[1]};
-// 	console.log("x: "+point[0]+", y:"+point[1]);
-// //	mousemove();
-// }
-
-function getLetterAngle (){
-	var angles = [];
-	var letters = svg.selectAll('.node').each(function(d){
-		d.angle = xyToAngle(d.x, d.y);
-	});
-}
-
-function xyToAngle(x, y){
-	var halfAngle = 57.2957795 * (Math.atan2((-1*(y - height/2)), (x - width/ 2)));
-		return halfAngle >= 0 ? halfAngle : 360 + halfAngle;
+function emphasizeWedge (letter) {
+	svg.select('#' + letter)
+		.transition()
+			.duration(50)
+			.attr('d', largeArc)
+			.style('fill', '#b6b6b6')
+			// .style('stroke', '#c6dbef');
+			
+	svg.select('#txt'+letter)
+		.style('fill', '#c7011c')
+		.style("font-size", 18)
+		.attr("dy", ".37em");
 }
 
 function addText(txt){
 	var currentText = document.getElementById('message'),
 		val = currentText.value;
+
 	currentText.value = val.match(/(\.\s+$)|(^$)|(\n$)/) ? val + txt.toUpperCase() : val + txt.toLowerCase();
-	currentText.focus();
 }
+
+function updateText() {
+
+}
+
 function rmSpace(){
 	var currentText = document.getElementById('message');
 	currentText.value = currentText.value.trim();
-	currentText.focus();
 }
 
 function addSpace(){
@@ -721,5 +493,12 @@ function flash(){
 	
 }
 
-
 </script>
+
+<body class="selectDisable">
+	<div>
+	<form class='text-form'>
+		<textarea id='message' class='messageBox' type='text' autocomplete="on" autocorrect="on" autocapitalize="off" spellcheck="on" placeholder="Write your message here. Click center circle once for space and double click for a period."></textarea>
+	</form>
+	</div>
+</body>
